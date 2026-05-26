@@ -55,6 +55,26 @@ window.dispatchEvent(new Event("fbReady"));
     --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
   }
 
+  body.dark {
+    --bg: #0f1110;
+    --surface: #1a1f1c;
+    --surface2: #222820;
+    --border: #2e3530;
+    --border2: #3d4840;
+    --text: #e8ede9;
+    --text2: #94a396;
+    --text3: #5a6b5c;
+    --accent: #4a9060;
+    --accent-light: #1a2e20;
+    --accent2: #d4943a;
+    --accent2-light: #2a1f0a;
+    --danger: #d45050;
+    --danger-light: #2a1010;
+    --info: #4a7abf;
+    --info-light: #0e1e35;
+    --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 4px 16px rgba(0,0,0,0.2);
+  }
+
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   body {
@@ -319,6 +339,15 @@ window.dispatchEvent(new Event("fbReady"));
     background: var(--surface2);
     border-bottom: 1px solid var(--border);
   }
+
+  .sortable {
+    cursor: pointer;
+    user-select: none;
+    transition: color 0.15s;
+  }
+
+  .sortable:hover { color: var(--text); }
+  .sortable.sort-active { color: var(--accent); }
 
   .tx-date { font-size: 13px; color: var(--text2); }
 
@@ -598,6 +627,7 @@ window.dispatchEvent(new Event("fbReady"));
   <div class="header-actions">
     <button class="btn btn-sm" onclick="openImport()"><i class="ti ti-upload"></i> Importar CSV</button>
     <button class="btn btn-sm" onclick="openMetas()"><i class="ti ti-target"></i> Metas</button>
+    <button class="btn btn-sm" id="darkToggle" onclick="toggleDark()" title="Alternar modo escuro"><i class="ti ti-moon"></i></button>
     <button class="btn btn-primary btn-sm" onclick="openNovo()"><i class="ti ti-plus"></i> Novo lançamento</button>
   </div>
 </header>
@@ -664,11 +694,11 @@ window.dispatchEvent(new Event("fbReady"));
           <input type="text" class="filter-input" id="filtroTexto" placeholder="Buscar..." oninput="renderTransactions()">
         </div>
         <div class="tx-item tx-header">
-          <div>Data</div>
-          <div>Descrição</div>
-          <div class="col-cat">Categoria</div>
+          <div class="sortable" onclick="setSort('data')">Data <i class="ti ti-selector" id="sort-data" style="font-size:11px"></i></div>
+          <div class="sortable" onclick="setSort('descricao')">Descrição <i class="ti ti-selector" id="sort-descricao" style="font-size:11px"></i></div>
+          <div class="sortable col-cat" onclick="setSort('categoria')">Categoria <i class="ti ti-selector" id="sort-categoria" style="font-size:11px"></i></div>
           <div class="col-pay">Pagamento</div>
-          <div style="text-align:right">Valor</div>
+          <div class="sortable" style="text-align:right" onclick="setSort('valor')">Valor <i class="ti ti-selector" id="sort-valor" style="font-size:11px"></i></div>
           <div></div>
         </div>
         <div id="txList"></div>
@@ -804,11 +834,12 @@ window.dispatchEvent(new Event("fbReady"));
 <div class="modal-overlay" id="modalMetas">
   <div class="modal">
     <div class="modal-header">
-      <span class="modal-title">Metas mensais por categoria</span>
+      <span class="modal-title" id="modalMetasTitle">Metas mensais</span>
       <button class="btn btn-sm" onclick="closeModal('modalMetas')"><i class="ti ti-x"></i></button>
     </div>
     <div class="modal-body">
-      <p style="font-size:13px; color:var(--text3); margin-bottom:1rem;">Defina o limite de gastos para cada categoria. Deixe em branco para não definir meta.</p>
+      <p style="font-size:13px; color:var(--text3); margin-bottom:0.75rem;">Defina o limite de gastos por categoria para este mês. Deixe em branco para sem limite.</p>
+      <button class="btn btn-sm" style="margin-bottom:1rem" onclick="copiarMetasMesAnterior()"><i class="ti ti-copy"></i> Copiar metas do mês anterior</button>
       <div id="metasForm"></div>
     </div>
     <div class="modal-footer">
@@ -865,7 +896,7 @@ const CATEGORIAS = {
 const CORES = ['#2d5a3d','#c17f2a','#1e4a8a','#7b3fa0','#b83232','#1a7a7a','#8a5a1e','#3a6ea8','#5a8a3a','#a03060','#3a7a5a','#6a4a8a'];
 
 let lancamentos = [];
-let metas = {};
+let metas = {}; // { 'YYYY-MM': { categoria: valor } }
 let fbLoaded = false;
 
 let currentYear = new Date().getFullYear();
@@ -877,6 +908,8 @@ let importBuffer = [];
 let pendingReview = [];
 let currentPage = 1;
 const PER_PAGE = 15;
+let sortField = 'data';
+let sortDir = 'desc'; // 'asc' | 'desc' 
 
 let pizzaChartObj = null;
 let barrasChartObj = null;
@@ -904,7 +937,17 @@ function setLoading(on) {
   el.style.display = on ? 'block' : 'none';
 }
 
-// Salva metas no Firestore
+// Chave para metas do mês atual
+function metasKey() {
+  return `${currentYear}-${String(currentMonth+1).padStart(2,'0')}`;
+}
+
+// Retorna metas do mês atual
+function getMetasMes() {
+  return metas[metasKey()] || {};
+}
+
+// Salva metas no Firestore (objeto inteiro)
 async function saveMetas() {
   if (!window._fbReady) return;
   try {
@@ -953,9 +996,9 @@ function initFirebase() {
     }
     render();
   });
-  // Carrega metas
+  // Carrega metas (objeto com chaves YYYY-MM)
   window._getDocs(window._col('config')).then(snap => {
-    snap.docs.forEach(d => { if (d.id === 'metas') metas = d.data(); });
+    snap.docs.forEach(d => { if (d.id === 'metas') metas = d.data() || {}; });
     renderMetas();
   });
 }
@@ -1000,7 +1043,16 @@ function getFiltered() {
   if (sub) list = list.filter(l => l.subconta === sub);
   if (pag) list = list.filter(l => l.pagamento === pag);
   if (txt) list = list.filter(l => l.descricao.toLowerCase().includes(txt) || l.categoria.toLowerCase().includes(txt));
-  return list.sort((a,b) => b.data.localeCompare(a.data));
+  // Sorting
+  list.sort((a, b) => {
+    let va = a[sortField], vb = b[sortField];
+    if (sortField === 'valor') { va = parseFloat(va); vb = parseFloat(vb); }
+    else { va = String(va||'').toLowerCase(); vb = String(vb||'').toLowerCase(); }
+    if (va < vb) return sortDir === 'asc' ? -1 : 1;
+    if (va > vb) return sortDir === 'asc' ? 1 : -1;
+    return 0;
+  });
+  return list;
 }
 
 function populateFiltros() {
@@ -1104,7 +1156,8 @@ function renderMetas() {
   mes.forEach(l => { gastosCat[l.categoria] = (gastosCat[l.categoria] || 0) + l.valor; });
 
   const el = document.getElementById('metasList');
-  const cats = Object.keys(metas).filter(c => metas[c] > 0);
+  const metasMes = getMetasMes();
+  const cats = Object.keys(metasMes).filter(c => metasMes[c] > 0);
 
   if (!cats.length) {
     el.innerHTML = `<div class="empty-state" style="padding:1.5rem"><i class="ti ti-target" style="font-size:32px; margin-bottom:0.5rem"></i>Sem metas definidas.<br><small>Clique no botão Metas para configurar.</small></div>`;
@@ -1112,7 +1165,7 @@ function renderMetas() {
   }
 
   el.innerHTML = cats.map(cat => {
-    const meta = metas[cat];
+    const meta = metasMes[cat];
     const gasto = gastosCat[cat] || 0;
     const pct = Math.min(100, Math.round((gasto / meta) * 100));
     const cls = pct < 75 ? 'progress-ok' : pct < 100 ? 'progress-warn' : 'progress-over';
@@ -1232,6 +1285,33 @@ function render() {
   renderSummary();
   renderMetas();
   renderCharts();
+}
+
+// ============================================================
+// SORTING
+// ============================================================
+function setSort(field) {
+  if (sortField === field) {
+    sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    sortField = field;
+    sortDir = field === 'data' || field === 'valor' ? 'desc' : 'asc';
+  }
+  // Update header icons
+  ['data','descricao','categoria','valor'].forEach(f => {
+    const el = document.getElementById('sort-' + f);
+    if (!el) return;
+    el.className = sortField === f
+      ? (sortDir === 'asc' ? 'ti ti-chevron-up' : 'ti ti-chevron-down')
+      : 'ti ti-selector';
+  });
+  // Update active class
+  document.querySelectorAll('.sortable').forEach(el => el.classList.remove('sort-active'));
+  document.querySelectorAll('.sortable').forEach(el => {
+    if (el.onclick && el.onclick.toString().includes(`'${field}'`)) el.classList.add('sort-active');
+  });
+  currentPage = 1;
+  renderTransactions();
 }
 
 // ============================================================
@@ -1376,10 +1456,12 @@ function excluirLancamento(id) {
 // ============================================================
 function openMetas() {
   const cats = Object.keys(CATEGORIAS).filter(c => c !== 'Receitas');
+  const metasMes = getMetasMes();
+  document.getElementById('modalMetasTitle').textContent = `Metas — ${MESES[currentMonth]} ${currentYear}`;
   document.getElementById('metasForm').innerHTML = cats.map(cat => `
     <div class="meta-edit-item">
       <div class="meta-edit-label">${cat}</div>
-      <input type="number" class="form-control" id="meta_${cat.replace(/\s/g,'_')}" placeholder="Sem limite" value="${metas[cat] || ''}" min="0" step="0.01">
+      <input type="number" class="form-control" id="meta_${cat.replace(/\s/g,'_')}" placeholder="Sem limite" value="${metasMes[cat] || ''}" min="0" step="0.01">
     </div>
   `).join('');
   document.getElementById('modalMetas').classList.add('open');
@@ -1387,14 +1469,31 @@ function openMetas() {
 
 function salvarMetas() {
   const cats = Object.keys(CATEGORIAS).filter(c => c !== 'Receitas');
+  const key = metasKey();
+  if (!metas[key]) metas[key] = {};
   cats.forEach(cat => {
     const v = parseFloat(document.getElementById('meta_' + cat.replace(/\s/g,'_')).value);
-    if (v > 0) metas[cat] = v; else delete metas[cat];
+    if (v > 0) metas[key][cat] = v;
+    else delete metas[key][cat];
   });
   saveMetas();
   closeModal('modalMetas');
   renderMetas();
   toast('Metas salvas!');
+}
+
+function copiarMetasMesAnterior() {
+  let m = currentMonth - 1, y = currentYear;
+  if (m < 0) { m = 11; y--; }
+  const prevKey = `${y}-${String(m+1).padStart(2,'0')}`;
+  const prevMetas = metas[prevKey] || {};
+  if (!Object.keys(prevMetas).length) { toast('Nenhuma meta encontrada no mês anterior'); return; }
+  // Preenche os campos do formulário
+  Object.entries(prevMetas).forEach(([cat, val]) => {
+    const el = document.getElementById('meta_' + cat.replace(/\s/g,'_'));
+    if (el) el.value = val;
+  });
+  toast('Metas do mês anterior carregadas!');
 }
 
 // ============================================================
@@ -1657,6 +1756,25 @@ async function confirmarImport() {
 }
 
 // ============================================================
+// DARK MODE
+// ============================================================
+function toggleDark() {
+  const isDark = document.body.classList.toggle('dark');
+  localStorage.setItem('financas_dark', isDark ? '1' : '0');
+  const btn = document.getElementById('darkToggle');
+  btn.innerHTML = isDark ? '<i class="ti ti-sun"></i>' : '<i class="ti ti-moon"></i>';
+}
+
+function initDarkMode() {
+  const saved = localStorage.getItem('financas_dark');
+  if (saved === '1') {
+    document.body.classList.add('dark');
+    const btn = document.getElementById('darkToggle');
+    if (btn) btn.innerHTML = '<i class="ti ti-sun"></i>';
+  }
+}
+
+// ============================================================
 // MODAL UTILS
 // ============================================================
 function closeModal(id) {
@@ -1677,6 +1795,7 @@ if (window._fbReady) {
   window.addEventListener('fbReady', initFirebase, { once: true });
 }
 // Render inicial vazio enquanto carrega
+initDarkMode();
 render();
 </script>
 </body>
