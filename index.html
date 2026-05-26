@@ -982,6 +982,7 @@ const CATEGORIAS = {
   'Higiene e Cuidados Pessoais 🪥': ['Produtos de higiene', 'Cabeleireiro / barbeiro', 'Cosméticos'],
   'Finanças e Contabilidade 📊': ['Declaração / Impostos', 'Empréstimos ou financiamentos', 'Taxas bancárias'],
   'Lazer e Entretenimento 🎉': ['Cinema, shows, teatro', 'Viagens', 'Bares e festas', 'Hobbies'],
+  'Compras e Bens 🛒': ['Eletrodomésticos', 'Eletrônicos / Informática', 'Móveis', 'Decoração', 'Utensílios domésticos', 'Reforma / construção'],
   'Outros 📦': ['Presentes', 'Doações', 'Gastos com pets', 'Outros']
 };
 
@@ -1159,7 +1160,12 @@ function populateFiltros() {
   const subSel = document.getElementById('filtroSubconta');
   const catVal = catSel.value;
   catSel.innerHTML = '<option value="">Todas as categorias</option>';
+  const showReceitas = currentTab !== 'despesas';
+  const showDespesas = currentTab !== 'receitas';
   Object.keys(CATEGORIAS).forEach(c => {
+    const isReceita = c.startsWith('Receitas');
+    if (isReceita && !showReceitas) return;
+    if (!isReceita && !showDespesas) return;
     const o = document.createElement('option');
     o.value = c; o.textContent = c;
     if (c === catVal) o.selected = true;
@@ -1482,7 +1488,7 @@ function setTipo(tipo) {
 
 function populateFormCategorias() {
   const sel = document.getElementById('fCategoria');
-  const cats = currentTipo === 'receita' ? ['Receitas'] : Object.keys(CATEGORIAS).filter(c => !c.startsWith('Receitas'));
+  const cats = currentTipo === 'receita' ? ['Receitas 💰'] : Object.keys(CATEGORIAS).filter(c => !c.startsWith('Receitas'));
   sel.innerHTML = '<option value="">Selecione...</option>';
   cats.forEach(c => {
     const o = document.createElement('option'); o.value = c; o.textContent = c; sel.appendChild(o);
