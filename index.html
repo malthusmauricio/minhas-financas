@@ -1584,8 +1584,7 @@ function processFile(file) {
 
 function parseNubankCSV(text) {
   // Split respeitando vírgulas dentro de aspas
-  const rows = text.trim().split('
-').map(line => {
+  const rows = text.trim().split('\n').map(line => {
     const result = [];
     let cur = '', inQ = false;
     for (const ch of line) {
