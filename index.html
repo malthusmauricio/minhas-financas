@@ -7,30 +7,30 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, getDocs, addDoc, setDoc, deleteDoc, doc, writeBatch, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-const firebaseConfig = {
-  apiKey: "AIzaSyB6LBZ0BNtgd7uAo74yaVfCxhPt7TGU17A",
-  authDomain: "malthusmgo.firebaseapp.com",
-  projectId: "malthusmgo",
-  storageBucket: "malthusmgo.firebasestorage.app",
-  messagingSenderId: "861459991331",
-  appId: "1:861459991331:web:1212c1696756a89faf1a96"
-};
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-window._db = db;
-window._col = (path) => collection(db, path);
-window._getDocs = getDocs;
-window._addDoc = addDoc;
-window._setDoc = setDoc;
-window._deleteDoc = deleteDoc;
-window._docRef = (path, id) => doc(db, path, id);
-window._writeBatch = () => writeBatch(db);
-window._onSnapshot = onSnapshot;
-window._fbReady = true;
-window.dispatchEvent(new Event("fbReady"));
+<!-- Firebase Compat SDK (funciona em qualquer rede) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyB6LBZ0BNtgd7uAo74yaVfCxhPt7TGU17A",
+    authDomain: "malthusmgo.firebaseapp.com",
+    projectId: "malthusmgo",
+    storageBucket: "malthusmgo.firebasestorage.app",
+    messagingSenderId: "861459991331",
+    appId: "1:861459991331:web:1212c1696756a89faf1a96"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+  window._db = db;
+  window._col = (path) => db.collection(path);
+  window._getDocs = (colRef) => colRef.get();
+  window._setDoc = (docRef, data) => docRef.set(data);
+  window._deleteDoc = (docRef) => docRef.delete();
+  window._docRef = (path, id) => db.collection(path).doc(id);
+  window._writeBatch = () => db.batch();
+  window._onSnapshot = (colRef, cb) => colRef.onSnapshot(snap => cb(snap));
+  window._fbReady = true;
+  window.dispatchEvent(new Event("fbReady"));
 </script>
 <style>
   :root {
