@@ -1218,7 +1218,19 @@ function renderTransactions() {
           <button class="btn btn-sm btn-danger" onclick="excluirLancamento('${l.id}')" title="Excluir"><i class="ti ti-trash"></i></button>
         </div>
       </div>`;
-    }).join('');
+    }).join('') + `
+    <div class="meta-item" style="border-top:2px solid var(--border2); margin-top:4px; padding-top:10px;">
+      <div class="meta-top">
+        <span class="meta-cat" style="font-weight:600">Total geral</span>
+        <span class="meta-values" style="font-weight:500">${fmt(totalGasto)} / ${fmt(totalMeta)}</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px; margin-top:5px;">
+        <div class="progress-bar" style="flex:1">
+          <div class="progress-fill" style="width:${totalBarWidth}%; background:${totalColor}"></div>
+        </div>
+        <span style="font-size:11px; font-weight:700; color:${totalColor}; min-width:36px; text-align:right">${totalPct}%</span>
+      </div>
+    </div>`;
   }
 
 }
@@ -1265,6 +1277,17 @@ function renderMetas() {
     el.innerHTML = `<div class="empty-state" style="padding:1.5rem"><i class="ti ti-target" style="font-size:32px; margin-bottom:0.5rem"></i>Sem metas definidas.<br><small>Clique no botão Metas para configurar.</small></div>`;
     return;
   }
+
+  // Totais
+  const totalMeta = cats.reduce((a, c) => a + (metasMes[c] || 0), 0);
+  const totalGasto = cats.reduce((a, c) => a + (gastosCat[c] || 0), 0);
+  const totalPct = totalMeta > 0 ? Math.round((totalGasto / totalMeta) * 100) : 0;
+  const totalBarWidth = Math.min(100, totalPct);
+  let totalColor;
+  if (totalPct <= 80) totalColor = 'var(--accent)';
+  else if (totalPct <= 100) totalColor = 'var(--info)';
+  else if (totalPct <= 110) totalColor = 'var(--accent2)';
+  else totalColor = 'var(--danger)';
 
   el.innerHTML = cats.map(cat => {
     const meta = metasMes[cat];
