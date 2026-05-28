@@ -356,7 +356,7 @@ window.dispatchEvent(new Event("fbReady"));
 
   .tx-item {
     display: grid;
-    grid-template-columns: 70px 2fr 130px 100px 90px 55px;
+    grid-template-columns: 70px 2fr 130px 100px 100px 64px;
     align-items: center;
     padding: 0.75rem 1.5rem;
     border-bottom: 1px solid var(--border);
@@ -410,12 +410,15 @@ window.dispatchEvent(new Event("fbReady"));
     font-size: 14px;
     font-weight: 500;
     text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .tx-value.receita { color: var(--accent); }
   .tx-value.despesa { color: var(--danger); }
 
-  .tx-actions { display: flex; gap: 4px; justify-content: flex-end; }
+  .tx-actions { display: flex; gap: 2px; justify-content: flex-end; flex-shrink: 0; }
 
   .badge {
     display: inline-block;
@@ -1266,15 +1269,25 @@ function renderMetas() {
   el.innerHTML = cats.map(cat => {
     const meta = metasMes[cat];
     const gasto = gastosCat[cat] || 0;
-    const pct = Math.min(100, Math.round((gasto / meta) * 100));
-    const cls = pct < 75 ? 'progress-ok' : pct < 100 ? 'progress-warn' : 'progress-over';
+    const pct = Math.round((gasto / meta) * 100);
+    const pctDisplay = pct;
+    const barWidth = Math.min(100, pct);
+    // Color rules: 0-80 verde, 81-100 azul, 101-110 amarelo, >110 vermelho
+    let barColor;
+    if (pct <= 80) barColor = 'var(--accent)';
+    else if (pct <= 100) barColor = 'var(--info)';
+    else if (pct <= 110) barColor = 'var(--accent2)';
+    else barColor = 'var(--danger)';
     return `<div class="meta-item">
       <div class="meta-top">
         <span class="meta-cat">${cat}</span>
         <span class="meta-values">${fmt(gasto)} / ${fmt(meta)}</span>
       </div>
-      <div class="progress-bar">
-        <div class="progress-fill ${cls}" style="width:${pct}%"></div>
+      <div style="display:flex; align-items:center; gap:8px; margin-top:5px;">
+        <div class="progress-bar" style="flex:1">
+          <div class="progress-fill" style="width:${barWidth}%; background:${barColor}"></div>
+        </div>
+        <span style="font-size:11px; font-weight:600; color:${barColor}; min-width:36px; text-align:right">${pctDisplay}%</span>
       </div>
     </div>`;
   }).join('');
