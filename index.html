@@ -1273,12 +1273,7 @@ function renderMetas() {
   const metasMes = getMetasMes();
   const cats = Object.keys(metasMes).filter(c => metasMes[c] > 0);
 
-  if (!cats.length) {
-    el.innerHTML = `<div class="empty-state" style="padding:1.5rem"><i class="ti ti-target" style="font-size:32px; margin-bottom:0.5rem"></i>Sem metas definidas.<br><small>Clique no botão Metas para configurar.</small></div>`;
-    return;
-  }
-
-  // Totais
+  // Totais — calculados antes do innerHTML
   const totalMeta = cats.reduce((a, c) => a + (metasMes[c] || 0), 0);
   const totalGasto = cats.reduce((a, c) => a + (gastosCat[c] || 0), 0);
   const totalPct = totalMeta > 0 ? Math.round((totalGasto / totalMeta) * 100) : 0;
@@ -1288,6 +1283,11 @@ function renderMetas() {
   else if (totalPct <= 100) totalColor = 'var(--info)';
   else if (totalPct <= 110) totalColor = 'var(--accent2)';
   else totalColor = 'var(--danger)';
+
+  if (!cats.length) {
+    el.innerHTML = `<div class="empty-state" style="padding:1.5rem"><i class="ti ti-target" style="font-size:32px; margin-bottom:0.5rem"></i>Sem metas definidas.<br><small>Clique no botão Metas para configurar.</small></div>`;
+    return;
+  }
 
   el.innerHTML = cats.map(cat => {
     const meta = metasMes[cat];
