@@ -674,6 +674,7 @@ window.dispatchEvent(new Event("fbReady"));
       <span id="totalCaixa" style="font-weight:600; margin-left:4px; color:var(--accent)">R$ 0</span>
     </button>
     <button class="btn btn-sm" onclick="openMetas()"><i class="ti ti-target"></i> Metas</button>
+    <button class="btn btn-sm" id="eyeToggle" onclick="toggleEye()" title="Ocultar valores"><i class="ti ti-eye"></i></button>
     <button class="btn btn-sm" id="darkToggle" onclick="toggleDark()" title="Alternar modo escuro"><i class="ti ti-moon"></i></button>
     <button class="btn btn-primary btn-sm" onclick="openNovo()"><i class="ti ti-plus"></i> Novo lançamento</button>
   </div>
@@ -713,10 +714,16 @@ window.dispatchEvent(new Event("fbReady"));
 
   </div>
 
+  <!-- TABS PRINCIPAIS -->
+  <div style="display:flex; gap:6px; margin-bottom:1rem;">
+    <button class="btn" id="mainTabLancamentos" onclick="setMainTab('lancamentos')" style="font-weight:500; background:var(--accent); color:white; border-color:var(--accent)">Lançamentos</button>
+    <button class="btn" id="mainTabVisualizacoes" onclick="setMainTab('visualizacoes')">Visualizações</button>
+  </div>
+
   <!-- CONTEÚDO PRINCIPAL -->
   <div class="content-grid">
     <!-- LANÇAMENTOS -->
-    <div>
+    <div id="mainPanelLancamentos">
       <div class="section">
         <div class="section-header">
           <span class="section-title">Lançamentos</span>
@@ -750,30 +757,34 @@ window.dispatchEvent(new Event("fbReady"));
           <div></div>
         </div>
         <div id="txList"></div>
-        <div class="pagination">
-          <span id="paginationInfo"></span>
-          <div class="pagination-btns" id="paginationBtns"></div>
-        </div>
+
       </div>
 
-      <!-- GRÁFICOS -->
-      <div class="section" style="margin-top: 1rem;">
+    </div>
+
+    <!-- VISUALIZAÇÕES PANEL -->
+    <div id="mainPanelVisualizacoes" style="display:none">
+      <div class="section">
         <div class="section-header">
           <span class="section-title">Visualizações</span>
           <div class="tabs">
-            <button class="tab active" onclick="setChartTab('pizza', this)">Por categoria</button>
-            <button class="tab" onclick="setChartTab('barras', this)">Mensal</button>
-            <button class="tab" onclick="setChartTab('linha', this)">Histórico</button>
+            <button class="tab active" id="chartTabPizza" onclick="setChartTab('pizza', this)">Por categoria</button>
+            <button class="tab" id="chartTabBarCat" onclick="setChartTab('barcat', this)">Ranking</button>
+            <button class="tab" id="chartTabBarras" onclick="setChartTab('barras', this)">Mensal</button>
+            <button class="tab" id="chartTabLinha" onclick="setChartTab('linha', this)">Histórico</button>
           </div>
         </div>
         <div class="chart-wrap">
-          <div id="chartPizza" style="max-width:400px; margin:0 auto; position:relative; height:300px;">
+          <div id="chartPizza" style="max-width:420px; margin:0 auto; position:relative; height:340px;">
             <canvas id="pizzaChart" role="img" aria-label="Gráfico de pizza por categoria"></canvas>
           </div>
-          <div id="chartBarras" style="display:none; position:relative; height:300px;">
+          <div id="chartBarCat" style="display:none; position:relative; height:420px;">
+            <canvas id="barCatChart" role="img" aria-label="Gráfico de barras por categoria"></canvas>
+          </div>
+          <div id="chartBarras" style="display:none; position:relative; height:340px;">
             <canvas id="barrasChart" role="img" aria-label="Gráfico de barras mensal"></canvas>
           </div>
-          <div id="chartLinha" style="display:none; position:relative; height:300px;">
+          <div id="chartLinha" style="display:none; position:relative; height:340px;">
             <canvas id="linhaChart" role="img" aria-label="Gráfico de linha histórico"></canvas>
           </div>
         </div>
@@ -1001,7 +1012,6 @@ let editandoId = null;
 let importBuffer = [];
 let pendingReview = [];
 let currentPage = 1;
-const PER_PAGE = 15;
 let sortField = 'data';
 let sortDir = 'desc'; // 'asc' | 'desc' 
 
@@ -1187,15 +1197,11 @@ function populateFiltros() {
 function renderTransactions() {
   const list = getFiltered();
   const total = list.length;
-  const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
-  if (currentPage > totalPages) currentPage = totalPages;
-  const page = list.slice((currentPage-1)*PER_PAGE, currentPage*PER_PAGE);
-
   const el = document.getElementById('txList');
-  if (!page.length) {
+  if (!list.length) {
     el.innerHTML = `<div class="empty-state"><i class="ti ti-receipt-off"></i>Nenhum lançamento encontrado</div>`;
   } else {
-    el.innerHTML = page.map(l => {
+    el.innerHTML = list.map(l => {
       const badge = l.recorrente ? `<span class="badge badge-recorrente">Recorrente</span>` :
                     l.parcelas ? `<span class="badge badge-parcelado">${l.parcelaAtual}/${l.parcelas}x</span>` : '';
       return `<div class="tx-item">
@@ -1212,18 +1218,6 @@ function renderTransactions() {
     }).join('');
   }
 
-  // Paginação
-  document.getElementById('paginationInfo').textContent = `${total} lançamento${total!==1?'s':''} • Página ${currentPage} de ${totalPages}`;
-  const btns = document.getElementById('paginationBtns');
-  btns.innerHTML = `
-    <button class="btn btn-sm" onclick="changePage(-1)" ${currentPage===1?'disabled':''} ><i class="ti ti-chevron-left"></i></button>
-    <button class="btn btn-sm" onclick="changePage(1)" ${currentPage===totalPages?'disabled':''}><i class="ti ti-chevron-right"></i></button>
-  `;
-}
-
-function changePage(d) {
-  currentPage += d;
-  renderTransactions();
 }
 
 function formatDate(s) {
@@ -1290,7 +1284,9 @@ function renderMetas() {
 // GRÁFICOS
 // ============================================================
 function renderCharts() {
-  renderPizza();
+  if (currentMainTab !== 'visualizacoes') return; // only render when visible
+  if (currentChartTab === 'pizza') renderPizza();
+  if (currentChartTab === 'barcat') renderBarCat();
   if (currentChartTab === 'barras') renderBarras();
   if (currentChartTab === 'linha') renderLinha();
 }
@@ -1368,14 +1364,51 @@ function renderLinha() {
   });
 }
 
+let barCatChartObj = null;
+
+function renderBarCat() {
+  const mes = getLancamentosMes().filter(l => l.tipo === 'despesa');
+  const gastos = {};
+  mes.forEach(l => { gastos[l.categoria] = (gastos[l.categoria] || 0) + l.valor; });
+  // Sort maior -> menor
+  const sorted = Object.entries(gastos).sort((a,b) => b[1]-a[1]);
+  const labels = sorted.map(([k]) => k);
+  const data = sorted.map(([,v]) => v);
+  if (barCatChartObj) barCatChartObj.destroy();
+  if (!labels.length) return;
+  barCatChartObj = new Chart(document.getElementById('barCatChart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{ data, backgroundColor: CORES.slice(0, labels.length), borderRadius: 6, borderSkipped: false }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { callback: v => 'R$' + v.toLocaleString('pt-BR') } },
+        y: { ticks: { font: { size: 12 } } }
+      }
+    }
+  });
+}
+
 function setChartTab(tab, el) {
   currentChartTab = tab;
-  document.querySelectorAll('.section:last-child .tab').forEach(t => t.classList.remove('active'));
+  // Update active tab
+  ['chartTabPizza','chartTabBarCat','chartTabBarras','chartTabLinha'].forEach(id => {
+    const t = document.getElementById(id);
+    if (t) t.classList.remove('active');
+  });
   el.classList.add('active');
   document.getElementById('chartPizza').style.display = tab==='pizza' ? 'block' : 'none';
+  document.getElementById('chartBarCat').style.display = tab==='barcat' ? 'block' : 'none';
   document.getElementById('chartBarras').style.display = tab==='barras' ? 'block' : 'none';
   document.getElementById('chartLinha').style.display = tab==='linha' ? 'block' : 'none';
   if (tab==='pizza') renderPizza();
+  if (tab==='barcat') renderBarCat();
   if (tab==='barras') renderBarras();
   if (tab==='linha') renderLinha();
 }
@@ -2109,6 +2142,57 @@ async function salvarCaixaMov() {
   document.getElementById('caixaValor').value = '';
   document.getElementById('caixaDesc').value = '';
   document.getElementById('caixaData').value = new Date().toISOString().split('T')[0];
+}
+
+// ============================================================
+// MAIN TABS (Lançamentos / Visualizações)
+// ============================================================
+let currentMainTab = 'lancamentos';
+
+function setMainTab(tab) {
+  currentMainTab = tab;
+  const isLanc = tab === 'lancamentos';
+  document.getElementById('mainPanelLancamentos').style.display = isLanc ? '' : 'none';
+  document.getElementById('mainPanelVisualizacoes').style.display = isLanc ? 'none' : '';
+  document.getElementById('mainTabLancamentos').style.cssText = isLanc
+    ? 'font-weight:500; background:var(--accent); color:white; border-color:var(--accent)'
+    : '';
+  document.getElementById('mainTabVisualizacoes').style.cssText = !isLanc
+    ? 'font-weight:500; background:var(--accent); color:white; border-color:var(--accent)'
+    : '';
+  if (!isLanc) renderCharts();
+}
+
+// ============================================================
+// EYE TOGGLE — ocultar valores
+// ============================================================
+let valuesHidden = false;
+
+function toggleEye() {
+  valuesHidden = !valuesHidden;
+  const btn = document.getElementById('eyeToggle');
+  btn.innerHTML = valuesHidden ? '<i class="ti ti-eye-off"></i>' : '<i class="ti ti-eye"></i>';
+  // Toggle all money values
+  const ids = ['totalReceitas','totalDespesas','totalSaldo','totalCaixa'];
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (valuesHidden) {
+      el.dataset.realValue = el.textContent;
+      el.textContent = '••••••';
+    } else {
+      if (el.dataset.realValue) el.textContent = el.dataset.realValue;
+    }
+  });
+  // Also toggle tx values
+  document.querySelectorAll('.tx-value').forEach(el => {
+    if (valuesHidden) {
+      el.dataset.realValue = el.textContent;
+      el.textContent = '••••';
+    } else {
+      if (el.dataset.realValue) el.textContent = el.dataset.realValue;
+    }
+  });
 }
 
 // ============================================================
